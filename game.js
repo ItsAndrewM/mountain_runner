@@ -4,29 +4,30 @@ canvas.width = 800;
 canvas.height = 600;
 
 let gameRunning = true;
-let bigfootDistance = 0;
+let bigfootActive = false;
 let score = 0;
 const scoreIncrement = 1;
 const scoreUpdateInterval = 1000; // Increment score every 1000 milliseconds
 let lastScoreUpdateTime = Date.now();
+let playerSpeed = 5;
 
 const player = {
   x: canvas.width / 2,
   y: 50,
   width: 50,
   height: 50,
-  speed: 5,
   moveUp: false,
   moveDown: false,
+  moveLeft: false,
+  moveRight: false,
 };
 
 let obstacles = [];
 const bigfoot = {
-  x: player.x,
-  y: 600,
+  x: -100,
+  y: -100,
   width: 60,
   height: 60,
-  speed: 2,
 };
 
 function updateGame() {
@@ -39,6 +40,7 @@ function updateGame() {
   if (currentTime - lastScoreUpdateTime > scoreUpdateInterval) {
     score += scoreIncrement;
     lastScoreUpdateTime = currentTime;
+    playerSpeed = 5 + Math.floor(score / 50);
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -57,21 +59,26 @@ function updateGame() {
 }
 
 function updatePlayer() {
-  if (player.moveUp) player.y -= player.speed;
-  if (player.moveDown) player.y += player.speed;
-  if (player.moveLeft) player.x -= player.speed;
-  if (player.moveRight) player.x += player.speed;
+  if (player.moveUp) player.y -= playerSpeed;
+  if (player.moveDown) player.y += playerSpeed;
+  if (player.moveLeft) player.x -= playerSpeed;
+  if (player.moveRight) player.x += playerSpeed;
 
-  // Ensure the player stays within canvas bounds
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
   player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 }
+
 function updateObstacles() {
   obstacles.forEach((obstacle) => (obstacle.y -= 5));
   obstacles = obstacles.filter((obstacle) => obstacle.y + obstacle.height > 0);
 
-  if (Math.random() < 0.02) {
-    const size = Math.random() * 50 + 25;
+  if (Math.random() < 0.03) {
+    let size;
+    if (Math.random() < 0.5) {
+      size = Math.random() * 25 + 10;
+    } else {
+      size = Math.random() * 50 + 25;
+    }
     obstacles.push({
       x: Math.random() * (canvas.width - size),
       y: canvas.height,
@@ -82,12 +89,12 @@ function updateObstacles() {
 }
 
 function updateBigfoot() {
-  bigfoot.y -= bigfoot.speed;
-  bigfoot.x = player.x;
-
-  if (bigfoot.y < -bigfoot.height) {
-    bigfoot.y = canvas.height + bigfootDistance;
-    bigfootDistance = Math.max(0, bigfootDistance - 10);
+  if (bigfootActive) {
+    bigfoot.x = player.x;
+    bigfoot.y = player.y;
+  } else {
+    bigfoot.x = -100;
+    bigfoot.y = -100;
   }
 }
 
@@ -101,24 +108,16 @@ function preciseAABBCollision(rect1, rect2) {
 }
 
 function checkCollisions() {
-  if (preciseAABBCollision(player, bigfoot)) {
-    gameRunning = false;
-  }
   obstacles.forEach((obstacle) => {
     if (preciseAABBCollision(player, obstacle)) {
+      bigfootActive = true;
       gameRunning = false;
     }
   });
-  if (preciseAABBCollision(player, bigfoot)) {
-    gameRunning = false;
-    resetBigfootPosition(); // Reset Bigfoot's position on collision
-  }
-}
 
-function resetBigfootPosition() {
-  bigfoot.x = player.x;
-  bigfoot.y = 600; // Starting y position off-canvas
-  bigfootDistance = 0; // Reset the distance
+  if (bigfootActive && preciseAABBCollision(player, bigfoot)) {
+    gameRunning = false;
+  }
 }
 
 function drawPlayer() {
@@ -134,8 +133,10 @@ function drawObstacles() {
 }
 
 function drawBigfoot() {
-  ctx.fillStyle = "blue";
-  ctx.fillRect(bigfoot.x, bigfoot.y, bigfoot.width, bigfoot.height);
+  if (bigfootActive) {
+    ctx.fillStyle = "blue";
+    ctx.fillRect(bigfoot.x, bigfoot.y, bigfoot.width, bigfoot.height);
+  }
 }
 
 function drawGameOver() {
@@ -197,14 +198,14 @@ window.addEventListener("keyup", function (e) {
 function restartGame() {
   gameRunning = true;
   score = 0;
-  bigfootDistance = 0;
   player.x = canvas.width / 2;
   player.y = 50;
-  player.isJumping = false;
-  player.velocityY = 0;
+  player.moveUp = player.moveDown = player.moveLeft = player.moveRight = false;
+  playerSpeed = 5;
   obstacles = [];
   lastScoreUpdateTime = Date.now();
-  resetBigfootPosition(); // Reset Bigfoot's position on restart
+  bigfootActive = false;
   requestAnimationFrame(updateGame);
 }
+
 updateGame();
